@@ -1,61 +1,77 @@
 #include <Arduino.h>
 #include <Ticker.h>
 
-#define led 36 // Ensure this pin supports PWM on your specific board
-
-volatile int pwmValue = 0;
-volatile int step = 13; // 5% of 255 is approximately 13
+#define topLights 36 // Ensure this pin supports PWM on your specific board
+#define bottomLights 37
 
 Ticker timer;
+
+volatile int topPwm = 0;
+volatile int bottomPwm = 0;
+volatile int topBrightness = 0;
+volatile int bottomBrightness = 0;
+volatile int step = 5; // 5% brightness change
+bool stopFlag = true;
 
 void doTask()
 {
     // Placeholder for any task you want to perform
-    Serial.print("Brightness: ");
-    int brightness = map(pwmValue, 0, 255, 0, 100);
-    Serial.println(brightness);
+    Serial.print("Top Brightness: ");
+    Serial.println(topBrightness);
+    Serial.print("Bottom Brightness: ");
+    Serial.println(bottomBrightness);
     //   To-Do: Capture code.
     Serial.println("Take capture");
 }
 
 void updatePWM()
 {
-    analogWrite(led, pwmValue); // Write PWM value to the LED pin
-    doTask();
-
-    // Check if we reached the max or min value and reverse the direction
-    if (pwmValue >= 255 || pwmValue <= 0)
+    if (stopFlag)
     {
-        step = -step;
-        if (pwmValue >= 255)
+        topPwm = map(topBrightness, 0, 100, 0, 255);
+        bottomPwm = map(bottomBrightness, 0, 100, 0, 255);
+        analogWrite(topLights, topPwm); // Write PWM value to the LED pin
+        analogWrite(bottomLights, bottomPwm);
+        doTask();
+
+        // Check if we reached the max or min value and reverse the direction
+        if (topBrightness >= 100 || topBrightness <= 0)
         {
-            pwmValue = 255; // Ensure it doesn't go beyond 255
-            Serial.println("Reached maximum brightness. Decreasing now.");
+            if (topBrightness >= 100)
+            {
+                topBrightness = 100; // Ensure it doesn't go beyond 255
+            }
+            else if (topBrightness <= 0)
+            {
+                topBrightness = 0; // Ensure it doesn't go below 0
+                Serial.println("Reached minimum brightness. Increasing now.");
+            }
         }
-        else if (pwmValue <= 0)
+
+        topBrightness += step; // Increment or decrement the pwm value
+        if (topBrightness > 100)
         {
-            pwmValue = 0; // Ensure it doesn't go below 0
-            Serial.println("Reached minimum brightness. Increasing now.");
+            topBrightness = 100; // Cap the value to 255
+            bottomBrightness = bottomBrightness + 5;
+            topBrightness = 0;
+        }
+        if (topBrightness < 0)
+        {
+            topBrightness = 0; // Cap the value to 0
+        }
+        if (bottomBrightness > 100)
+        {
+            bottomBrightness = 100;
+            stopFlag = false;
         }
     }
-
-    pwmValue += step; // Increment or decrement the pwm value
-    if (pwmValue > 255)
-        pwmValue = 255; // Cap the value to 255
-    if (pwmValue < 0)
-        pwmValue = 0; // Cap the value to 0
-
     // Simulate doing a task here, which happens every 50ms with the interrupt
 }
 
 void setup()
 {
-    pinMode(led, OUTPUT);
+    pinMode(topLights, OUTPUT);
     Serial.begin(115200);
-
-    // Configure LED PWM functionality
-    ledcSetup(0, 5000, 8); // Channel 0, 5 kHz, 8-bit resolution
-    ledcAttachPin(led, 0); // Attach the LED pin to channel 0
 
     timer.attach(1, updatePWM); // Call updatePWM every 1
 }
