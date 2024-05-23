@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <Ticker.h>
+
 
 #define topLights 36 // Ensure this pin supports PWM on your specific board
 #define bottomLights 37
