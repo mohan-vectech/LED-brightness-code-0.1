@@ -1,0 +1,83 @@
+#include <Arduino.h>
+#include "soc/soc_caps.h"
+#include "driver/ledc.h"
+#include <limits>
+
+// Define the pin for LEDC
+#define PIN 13
+
+void setup()
+{
+    Serial.begin(115200);
+
+    // Attach the LEDC PWM functionality to the specified pin
+    ledcAttachPin(PIN, 0);
+    ledcSetup(0, 1000, 8); // Timer 0, 1 kHz, 8-bit resolution
+
+    uint32_t min_frequency;
+    uint32_t max_frequency;
+    uint32_t frequency;
+    uint32_t successful_frequency;
+    uint32_t max_freq_array[SOC_LEDC_TIMER_BIT_WIDTH];
+    uint32_t min_freq_array[SOC_LEDC_TIMER_BIT_WIDTH];
+
+    // Find Max Frequency
+    for (uint8_t resolution = 1; resolution <= SOC_LEDC_TIMER_BIT_WIDTH; ++resolution)
+    {
+        max_freq_array[resolution - 1] = 0;
+        min_frequency = 0;
+        max_frequency = UINT32_MAX;
+        successful_frequency = 0;
+        while (min_frequency != max_frequency && min_frequency + 1 != max_frequency)
+        {
+            frequency = min_frequency + ((max_frequency - min_frequency) / 2);
+            if (ledcSetup(0, frequency, resolution) > 0)
+            {
+                min_frequency = frequency;
+                successful_frequency = frequency;
+            }
+            else
+            {
+                max_frequency = frequency;
+            }
+        }
+        max_freq_array[resolution - 1] = successful_frequency;
+    }
+
+    // Find Min Frequency
+    for (uint8_t resolution = 1; resolution <= SOC_LEDC_TIMER_BIT_WIDTH; ++resolution)
+    {
+        min_freq_array[resolution - 1] = 0;
+        min_frequency = 0;
+        max_frequency = max_freq_array[resolution - 1];
+        successful_frequency = max_frequency;
+        while (min_frequency != max_frequency && min_frequency + 1 != max_frequency)
+        {
+            frequency = min_frequency + ((max_frequency - min_frequency) / 2);
+            if (ledcSetup(0, frequency, resolution) > 0)
+            {
+                max_frequency = frequency;
+                successful_frequency = frequency;
+            }
+            else
+            {
+                min_frequency = frequency;
+            }
+        }
+        min_freq_array[resolution - 1] = successful_frequency;
+    }
+
+    Serial.printf("Bit resolution | Min Frequency [Hz] | Max Frequency [Hz]\n");
+    for (uint8_t r = 1; r <= SOC_LEDC_TIMER_BIT_WIDTH; ++r)
+    {
+        Serial.printf("            %2d |         %10u |         %10u\n", r, min_freq_array[r - 1], max_freq_array[r - 1]);
+    }
+
+    // Detach the LEDC PWM functionality from the pin
+    ledcDetachPin(PIN);
+}
+
+void loop()
+{
+    delay(1000);
+}
